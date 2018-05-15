@@ -5,32 +5,74 @@
     <meta charset="utf-8"/>
     <title>Auto-player instantiation example, showing how to obtain a reference to the MediaPlayer</title>
 
-    <!-- <script src="../../dist/dash.all.debug.js"></script> -->
-    <!--dash.all.min.js should be used in production over dash.all.debug.js
-        Debug files are not compressed or obfuscated making the file size much larger compared with dash.all.min.js-->
-    <!--<script src="../../dist/dash.all.min.js"></script>-->
-    <script src="https://cdn.dashjs.org/latest/dash.all.debug.js"></script>
+    <!-- <script src="https://cdn.dashjs.org/latest/dash.all.debug.js"></script> -->
+    <script src="dash.js/dist/dash.all.debug.js"></script>
 
     <script>
         var player;
+        var prevQuality = -1;
+        var prevTput = 0;
+        var prevPlayerTime = -1;
+        var rebufferingTime = 0;
+        var rebufferingStart = false;
+        var rebufferingStartTime = 0;
 
         function init()
         {
             player = dashjs.MediaPlayerFactory.create(document.querySelector(".dashjs-player"));
-            setInterval(updateStats,100)
+            setInterval(updateStats, 100);
+            player.setABRStrategy("abrThroughput");
+            // player.setABRStrategy("abrBola");
+            player.setStableBufferTime(30);
         }
 
         function updateStats()
         {
+
+            // Parse data
+            let quality = player.getQualityFor("video");
+            let tput = player.getAverageThroughput("video")
+            let time = Date.now();
+            if (quality !== prevQuality) {
+                console.log("[CSE534] @Time:" + time + ", quality = " + quality);
+                prevQuality = quality;
+            }   
+
+            let playerTime = player.time();
+            if (playerTime > 0 && prevPlayerTime === playerTime) {
+                if (rebufferingStart === false) {
+                    rebufferingStartTime = time;
+                    rebufferingStart = true;
+                }
+            } else {
+                if (rebufferingStart === true){
+                    rebufferingTime = (time - rebufferingStartTime)/1000;
+                    console.log("[CSE534] @Time:" + time + ", rebuffering: " + rebufferingStartTime
+                        + "<->" + time);
+                }
+                prevPlayerTime = playerTime;
+                rebufferingStart = false;
+            }
+
+            if (tput !== prevTput) {
+                // console.log("[CSE534] @Time:" + time + ", throughput = " + tput);
+                prevTput = tput;
+            }
+
             document.querySelector("#stats").innerHTML = 
-            "Buffer level " + player.getBufferLength() + "s" + 
-            "<br>" + "time " + player.time() + 
-            "<br>" + "getInitialBitrateFor Video " + player.getInitialBitrateFor('video') +
-            "<br>" + "getQualityFor Video " + player.getQualityFor("video") + 
-            "<br>" + "getABRStrategy " + player.getABRStrategy() + 
-            "<br>" + "getStableBufferTime " + player.getStableBufferTime() + 
-            "<br>" + "getAverageThroughput " + player.getAverageThroughput();
+            "<br>Time " + player.time() + " sec" + 
+            "<br>Rebuffering Time " + rebufferingTime + " sec" +
+            "<br>Buffer length " + player.getBufferLength("video") + " sec" + 
+            "<br>Playback Rate " + player.getPlaybackRate() +
+            "<br>Initial Bitrate For Video " + player.getInitialBitrateFor('video') +
+            "<br>Quality For Video " + player.getQualityFor("video") + 
+            "<br>ABR Strategy " + player.getABRStrategy() + 
+            "<br>Stable Buffer Time " + player.getStableBufferTime() + " sec" + 
+            "<br>Current Buffer Level " + player.getDashMetrics().getCurrentBufferLevel("video") + 
+            "<br>Initial Bitrate " + player.getInitialBitrateFor("video") + " bps" +
+            "<br>Average Throughput " + Math.round(player.getAverageThroughput("video")) + "bps";
         }
+
     </script>
     <style>
         video {
@@ -41,11 +83,21 @@
     </head>
     <body>
         <div>
-            <video class="dashjs-player" autoplay="" controls>
-                <source src="https://dash.akamaized.net/envivio/EnvivioDash3/manifest.mpd" type="application/dash+xml"/>
+            <video class="dashjs-player" autoplay="true" controls>
+                <!-- <source src="https://dash.akamaized.net/envivio/EnvivioDash3/manifest.mpd" type="application/dash+xml"/> -->
+                
+                <!-- <source src="http://localhost/~motorix/DASH/BigBuckBunny/1sec/BigBuckBunny_1s_onDemand_2014_05_09.mpd" type="application/dash+xml"/> -->
+
+                <!-- <source src="http://www-itec.uni-klu.ac.at/ftp/datasets/mmsys12/BigBuckBunny/MPDs/BigBuckBunnyNonSeg_1s_isoffmain_DIS_23009_1_v_2_1c2_2011_08_30.mpd" type="application/dash+xml"/> -->
+
+                <source src="http://172.24.25.52/~motorix/DASH/2sec/BigBuckBunny_2s_onDemand_2014_05_09.mpd" type="application/dash+xml"/>
+
+                <!-- <source src="http://172.24.25.52/~motorix/DASH/15sec/BigBuckBunny_15s_simple_2014_05_09.mpd" type="application/dash+xml"/> -->
+                
             </video>
         </div>
-        <div>
+        
+        <div>            
             <span id="stats"/>
         </div>
 
